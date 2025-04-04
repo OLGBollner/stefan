@@ -27,13 +27,8 @@
 float calcHeight(float x, float z);
 
 GLfloat t, worldTime; // In micro seconds.
-Model* windWalls;
-Model* windRoof;
-Model* windBlade;
-Model* windBalcony;
 Model* ground;
 Model* skyBox;
-Model* teapot;
 Model* ball;
 
 GLuint program, nolight;
@@ -57,8 +52,6 @@ bool keyDown[256];
 // vertex array object
 Model *m, *m2, *tm;
 // Reference to shader program
-GLuint tex1, tex2;
-TextureData ttex; // terrain
 
 const char* faces[5];
 GLuint cubemapTexture;
@@ -69,12 +62,12 @@ void init(void)
 {
     assets.loadAssets("assets/");
 
-	faces[0] = "assets/newskyboxtex/right.tga";
-	faces[1] = "assets/newskyboxtex/left.tga";
-	faces[3] = "assets/newskyboxtex/top.tga";
-	faces[2] = "assets/newskyboxtex/bottom.tga";
-	faces[4] = "assets/newskyboxtex/front.tga";
-	faces[5] = "assets/newskyboxtex/back.tga";
+	faces[0] = "assets/textures/newskyboxtexCM/right.tga";
+	faces[1] = "assets/textures/newskyboxtexCM/left.tga";
+	faces[3] = "assets/textures/newskyboxtexCM/top.tga";
+	faces[2] = "assets/textures/newskyboxtexCM/bottom.tga";
+	faces[4] = "assets/textures/newskyboxtexCM/front.tga";
+	faces[5] = "assets/textures/newskyboxtexCM/back.tga";
 	cubemapTexture = LoadTGACubemap(faces);
 
 	cameraToView = perspective(M_2_PI, SCREEN_WIDTH/SCREEN_HEIGHT, NEAR, FAR);
@@ -89,8 +82,8 @@ void init(void)
 	printError("GL inits");
 
 	// Load and compile shader
-	program = loadShaders("assets/lab4-2.vert", "assets/lab4-2.frag");
-	nolight = loadShaders("assets/lab4-2sky.vert", "assets/lab4-2sky.frag");
+	program = loadShaders("assets/shaders/lab4-2.vert", "assets/shaders/lab4-2.frag");
+	nolight = loadShaders("assets/shaders/lab4-2sky.vert", "assets/shaders/lab4-2sky.frag");
 	printError("init shader");
 
 	skyBox = LoadModel("assets/skybox-full-tweaked.obj");
@@ -98,8 +91,7 @@ void init(void)
 	ball = LoadModel("assets/groundsphere.obj");
 	ballPos = vec2{100,100};
 
-	LoadTGATextureData("assets/fft-terrain.tga", &ttex);
-	tm = GenerateTerrain(&ttex);
+	tm = GenerateTerrain(&assets.getTextureData("fft-terrain"));
 	printError("init terrain");
 
 	glutRepeatingTimer(DELTA_T);
@@ -110,10 +102,19 @@ void init(void)
 	glUniform3fv(glGetUniformLocation(program, "lightSourcesColorArr"), 4, &lightSourcesColorsArr[0].x);
 	glUniform1iv(glGetUniformLocation(program, "isDirectional"), 4, isDirectional);
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, assets.getTex("windBody"));
-	glActiveTexture(GL_TEXTURE1);
+    glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+    glActiveTexture(GL_TEXTURE1);
+    LoadTexture(&assets.getTextureData("dirt"));
+    glActiveTexture(GL_TEXTURE2);
+    LoadTexture(&assets.getTextureData("grass"));
+    glActiveTexture(GL_TEXTURE3);
+    LoadTexture(&assets.getTextureData("rock"));
+    glActiveTexture(GL_TEXTURE4);
+    LoadTexture(&assets.getTextureData("sand"));
+    glActiveTexture(GL_TEXTURE5);
+    LoadTexture(&assets.getTextureData("water"));
+
 
 	printError("init arrays");
 }
@@ -143,32 +144,29 @@ void display(void)
 
 	GLfloat specularExponent = 70;
 	vec3 kValues = vec3{0.1,0.9,0};
-	glUniform1i(glGetUniformLocation(program, "textureUnit"), 0); // Texture unit 0
-	glUniform1f(glGetUniformLocation(program, "specularStrength"), specularExponent);
-	glUniform3fv(glGetUniformLocation(program, "kValues"), 1, &kValues.x);
+    glUniform1i(glGetUniformLocation(program, "TUWater"), 1);             
+    glUniform1i(glGetUniformLocation(program, "TUSand"), 2);              
+    glUniform1i(glGetUniformLocation(program, "TURock"), 3);              
+    glUniform1i(glGetUniformLocation(program, "TUDirt"), 4);              
+    glUniform1i(glGetUniformLocation(program, "TUGrass"), 5);             
+    glUniform1f(glGetUniformLocation(program, "specularStrength"), specularExponent);
+    glUniform3fv(glGetUniformLocation(program, "kValues"), 1, &kValues.x);
+
 
     vec4 camPos {camera.getPosition()};
-	vec2 currentTile = vec2{std::floor(camPos.x/(ttex.width-1)),std::floor(camPos.z/(ttex.width-1))};
-	int renderDistance = std::ceil(1.41*FAR/(ttex.width-1));
+    TextureData terrain = assets.getTextureData("fft-terrain");
+	vec2 currentTile = vec2{std::floor(camPos.x/(terrain.width-1)),std::floor(camPos.z/(terrain.width-1))};
+	int renderDistance = std::ceil(1.41*FAR/(terrain.width-1));
 	int nr1 = 0;
 	int nr2 = 0;
 	for(int i = -renderDistance; i<renderDistance+1; i++)
 		for(int j = -renderDistance; j<renderDistance+1; j++)
 		{
 			nr2+=1;
-			//printf("%f, %f \n", (currentTile.x+i+0.5)*(ttex.width-1), (currentTile.y+j+0.5)*(ttex.width-1));
-			if (farPlane.x*((0.5)*(ttex.width-1))+
-				farPlane.y*(0)+
-				farPlane.z*((0.5)*(ttex.width-1))+
-				farPlane.w > -sqrt(farPlane.x*farPlane.x+farPlane.y*farPlane.y+farPlane.z*farPlane.z)*(ttex.width-1)/sqrt(2))
-				{
-					//modelToWorld = T((0)*(ttex.width-1),0,(0)*(ttex.width-1));
-
-					modelToWorld = T((currentTile.x+i)*(ttex.width-1),0,(currentTile.y+j)*(ttex.width-1));
-					glUniformMatrix4fv(glGetUniformLocation(program, "modelToWorld"), 1, GL_TRUE, modelToWorld.m);
-					DrawModel(tm, program, "in_Position", "in_Normal", "in_TextureCoord");
-					nr1+=1;
-				}
+            modelToWorld = T((currentTile.x+i)*(terrain.width-1),0,(currentTile.y+j)*(terrain.width-1));
+            glUniformMatrix4fv(glGetUniformLocation(program, "modelToWorld"), 1, GL_TRUE, modelToWorld.m);
+            DrawModel(tm, program, "in_Position", "in_Normal", "in_TextureCoord");
+            nr1+=1;
 		}
 	
 	modelToWorld = T(ballPos.x, calcHeight(ballPos.x, ballPos.y), ballPos.y);
@@ -213,38 +211,39 @@ void mouseMoved(int x, int y)
 float calcHeight(float x, float z)
 {
 	float height;
+    TextureData terrain {assets.getTextureData("fft-terrain")};
 	//printf("%f %f \n",x,z);
-	x = x < 0 ? (ttex.width-1) + fmod(x,ttex.width-1) : fmod(x,ttex.width-1);
-	z = z < 0 ? (ttex.width-1) + fmod(z,ttex.width-1) : fmod(z,ttex.width-1);
+	x = x < 0 ? (terrain.width-1) + fmod(x,terrain.width-1) : fmod(x,terrain.width-1);
+	z = z < 0 ? (terrain.width-1) + fmod(z,terrain.width-1) : fmod(z,terrain.width-1);
 	int xQuad = (int)std::floor(x);
 	int zQuad = (int)std::floor(z);
 	int triangle = x-xQuad + z-zQuad < 1 ? 0 : 1;
 	//float height = tm->vertexArray[(xQuad + zQuad * ttex.width)].y;
 	//camPos.y = ;
-	float h1 = tm->vertexArray[(xQuad + zQuad * (ttex.width))].y;
+	float h1 = tm->vertexArray[(xQuad + zQuad * (terrain.width))].y;
 	float h2; // = tm->vertexArray[(xQuad+1 + zQuad * (ttex.width-1))].y;
 	float h3; // = tm->vertexArray[(xQuad + (zQuad+1) * (ttex.width-1))].y;
 	float h4; // = tm->vertexArray[(xQuad+1 + (zQuad+1) * (ttex.width-1))].y;
-	if (xQuad == ttex.width-2 && zQuad == ttex.width-2)
+	if (xQuad == terrain.width-2 && zQuad == terrain.width-2)
 	{
-		h2 = tm->vertexArray[(0 + (zQuad) * (ttex.width))].y;
-		h3 = tm->vertexArray[(xQuad + (0) * (ttex.width))].y;
-		h4 = tm->vertexArray[(0 + (0) * (ttex.width))].y;
-	} else if (xQuad == ttex.width-2)
+		h2 = tm->vertexArray[(0 + (zQuad) * (terrain.width))].y;
+		h3 = tm->vertexArray[(xQuad + (0) * (terrain.width))].y;
+		h4 = tm->vertexArray[(0 + (0) * (terrain.width))].y;
+	} else if (xQuad == terrain.width-2)
 	{
-		h2 = tm->vertexArray[(0 + (zQuad) * (ttex.width))].y;
-		h3 = tm->vertexArray[(xQuad + (zQuad+1) * (ttex.width))].y;
-		h4 = tm->vertexArray[(0 + (zQuad+1) * (ttex.width))].y;
-	} else if (zQuad == ttex.width-2)
+		h2 = tm->vertexArray[(0 + (zQuad) * (terrain.width))].y;
+		h3 = tm->vertexArray[(xQuad + (zQuad+1) * (terrain.width))].y;
+		h4 = tm->vertexArray[(0 + (zQuad+1) * (terrain.width))].y;
+	} else if (zQuad == terrain.width-2)
 	{
-		h2 = tm->vertexArray[(xQuad+1 + (zQuad) * (ttex.width))].y;
-		h3 = tm->vertexArray[(xQuad + (0) * (ttex.width))].y;
-		h4 = tm->vertexArray[(xQuad+1 + (0) * (ttex.width))].y;
+		h2 = tm->vertexArray[(xQuad+1 + (zQuad) * (terrain.width))].y;
+		h3 = tm->vertexArray[(xQuad + (0) * (terrain.width))].y;
+		h4 = tm->vertexArray[(xQuad+1 + (0) * (terrain.width))].y;
 	} else 
 	{
-		h2 = tm->vertexArray[(xQuad+1 + zQuad * (ttex.width))].y;
-		h3 = tm->vertexArray[(xQuad + (zQuad+1) * (ttex.width))].y;
-		h4 = tm->vertexArray[(xQuad+1 + (zQuad+1) * (ttex.width))].y;
+		h2 = tm->vertexArray[(xQuad+1 + zQuad * (terrain.width))].y;
+		h3 = tm->vertexArray[(xQuad + (zQuad+1) * (terrain.width))].y;
+		h4 = tm->vertexArray[(xQuad+1 + (zQuad+1) * (terrain.width))].y;
 	}
 
 	if (triangle == 0) 

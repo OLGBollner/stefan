@@ -1,5 +1,5 @@
 SRCS := $(wildcard src/*.cc)
-CXXFlAGS := std=c++17 -Wall -Wextra -pedantic -Weffc++ -Wold-style-cast -fmax-errors=3 -g
+CXXFLAGS := -std=c++17 -Wall -Wextra -pedantic -Weffc++ -Wold-style-cast -fmax-errors=3 -g
 COMMON_DIR = ./common
 BUILD_DIR := ./build
 EXEC := stefan

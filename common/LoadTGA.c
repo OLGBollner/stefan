@@ -279,6 +279,32 @@ bool LoadTGATexture(const char *filename, TextureData *texture)	// Loads A TGA F
 	return true;				// Texture Building Went Ok, Return True
 }
 
+bool LoadTexture(TextureData* texture) // Load TextureData to GPU
+{
+	GLuint type = GL_RGBA;		// Set The Default GL Mode To RBGA (32 BPP)
+	glGenTextures(1, &texture->texID);			// Generate OpenGL texture IDs
+	glBindTexture(GL_TEXTURE_2D, texture->texID);		// Bind Our Texture
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);	// Linear Filtered
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	// Linear Filtered
+	if (texture->bpp == 8)						// Was The TGA 8 Bits? Should be grayscale then.
+	{
+		type=GL_RED;			// If So Set The 'type' To GL_RED
+	}
+	if (texture->bpp == 24)						// Was The TGA 24 Bits?
+	{
+		type=GL_RGB;			// If So Set The 'type' To GL_RGB
+	}
+	glTexImage2D(GL_TEXTURE_2D, 0, type, texture->width, texture->height, 0, type, GL_UNSIGNED_BYTE, texture[0].imageData);
+	
+	if (gMipmap)
+	{
+		glGenerateMipmap(GL_TEXTURE_2D);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);	// Linear Filtered
+	}
+	
+	return true;				// Texture Building Went Ok, Return True
+}
+
 void LoadTGATextureSimple(const char *filename, GLuint *tex) // If you really only need the texture object.
 {
 	TextureData texture;

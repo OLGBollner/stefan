@@ -45,6 +45,7 @@ typedef struct TextureData		// Create A Structure for .tga loading.
 } TextureData, *TextureDataPtr;					// Structure Name
 
 GLuint LoadTGACubemap(const char** filenames);
+bool LoadTexture(TextureData* texture);
 bool LoadTGATexture(const char *filename, TextureData *texture);
 void LoadTGATextureSimple(const char *filename, GLuint *tex);
 void LoadTGASetMipmapping(bool active);
